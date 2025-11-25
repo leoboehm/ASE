@@ -3,6 +3,7 @@ package MathPlot;
 import java.util.ArrayList;
 import java.util.List;
 
+import MathPlot.Parsers.AOS;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.input.MouseButton;
@@ -231,12 +232,32 @@ public class MathPlot {
         Trapezoidal
     }
 
+    private String expressionString;         // input expression
+    private String derivativeString;         // output derivative
+
     public MathPlot() {
-        // YOU CAN CHANGE HERE
+        this.expressionString = null;
+        this.derivativeString = null;
     }
 
     public void setExpression(String expr, ExpressionFormat format) {
-        // YOU CAN CHANGE HERE
+        // stop if format is not AOS
+        if (format != ExpressionFormat.AOS) {
+            return;
+        }
+
+        this.expressionString = expr;
+
+        try {
+            // parse expression string to AOS
+            AOS parser = new AOS();
+            AOS.Parts parsedExpression = parser.parse(expr);
+
+            // Compute derivative
+            this.derivativeString = calculateDerivative(parsedExpression);
+        } catch (Exception e) {
+            throw new RuntimeException("Error while parsing expression: " + e.getMessage());
+        }
     }
 
     public void plot(Canvas canvas, PlotType type) {
@@ -254,10 +275,78 @@ public class MathPlot {
     }
 
     public List<String> print(ExpressionFormat format) {
-        final List<String> res = new ArrayList<>();
+        List<String> res = new ArrayList<>();
 
-        // YOU CAN CHANGE HERE
+        // stop if format is not AOS
+        if (format != ExpressionFormat.AOS) {
+            return null;
+        }
+
+        // add original expression
+        if (this.expressionString != null) {
+            res.add(this.expressionString);
+        }
+        // add derivative
+        if (this.derivativeString != null) {
+            res.add(this.derivativeString);
+        }
 
         return res;
+    }
+
+    // calculate derivative
+    // public for testing
+    public String calculateDerivative(AOS.Parts node) throws Exception {
+        if (node == null) return "";
+
+        String op = node.main;
+        String leftStr = node.left;
+        String rightStr = node.right;
+
+        // x = 1, constants = 0
+        if (leftStr == null && rightStr == null) {
+            if ("x".equalsIgnoreCase(op)) return "1";
+            else return "0";
+        }
+
+        AOS parser = new AOS();
+
+        switch (op) {
+            case "+": case "-": {
+                AOS.Parts leftNode = parser.parse(leftStr);
+                AOS.Parts rightNode = parser.parse(rightStr);
+                return "(" + calculateDerivative(leftNode) + " " + op + " " + calculateDerivative(rightNode) + ")";
+            }
+            case "*": {
+                AOS.Parts leftNode = parser.parse(leftStr);
+                AOS.Parts rightNode = parser.parse(rightStr);
+                // product rule f'g + fg'
+                return "((" + calculateDerivative(leftNode) + " * " + rightStr + ") + (" + leftStr + " * " + calculateDerivative(rightNode) + "))";
+            }
+            case "/": {
+                AOS.Parts leftNode = parser.parse(leftStr);
+                AOS.Parts rightNode = parser.parse(rightStr);
+                // quotient rule (f'g - fg') / g^2
+                return "(((" + calculateDerivative(leftNode) + " * " + rightStr + ") - (" + leftStr + " * " + calculateDerivative(rightNode) + ")) / (" + rightStr + "^2))";
+            }
+            case "^": {
+                try {
+                    int exp = Integer.parseInt(rightStr);
+                    return "(" + rightStr + " * " + leftStr + "^" + (exp - 1) + ")";
+                } catch (NumberFormatException e) {
+                    return "d(" + leftStr + "^" + rightStr + ")";
+                }
+            }
+            default: {
+                AOS.Parts argNode = parser.parse(leftStr);
+                switch (op.toLowerCase()) {
+                    case "sin": return "(cos(" + leftStr + ") * " + calculateDerivative(argNode) + ")";
+                    case "cos": return "(-sin(" + leftStr + ") * " + calculateDerivative(argNode) + ")";
+                    case "exp": return "(exp(" + leftStr + ") * " + calculateDerivative(argNode) + ")";
+                    case "ln":  return "(" + calculateDerivative(argNode) + " / " + leftStr + ")";
+                    default:    return "d(" + op + ")";
+                }
+            }
+        }
     }
 }
