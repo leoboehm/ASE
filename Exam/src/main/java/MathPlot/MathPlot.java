@@ -243,6 +243,7 @@ public class MathPlot {
     public void setExpression(String expr, ExpressionFormat format) {
         // stop if format is not AOS
         if (format != ExpressionFormat.AOS) {
+            // TODO: implement RPN format
             return;
         }
 
@@ -265,6 +266,7 @@ public class MathPlot {
 
         // skip if not cartesian
         if (this.derivativeString == null || type != PlotType.Cartesian) {
+            // TODO: implement polar coordinate format
             pf.render();
             return;
         }
@@ -280,6 +282,8 @@ public class MathPlot {
         }
 
         ExpressionEvaluator evaluator = new ExpressionEvaluator();
+        // TODO: dynamically set xMin and xMax to make sure graph is always shown
+        // TODO: set xMin and yMax?
         final double xMin = -10.0, xMax = 10.0;
         final int steps = 1200;
 
@@ -367,6 +371,7 @@ public class MathPlot {
     }
 
     public double area(AreaType areaType) {
+        // TODO: implement area calculation (rectangular & trapezian)
         // YOU CAN CHANGE HERE
 
         return 0.0;
@@ -377,6 +382,7 @@ public class MathPlot {
 
         // return empty if format is not AOS
         if (format != ExpressionFormat.AOS) {
+            // TODO: implement RPN format
             return new ArrayList<>();
         }
 
@@ -395,6 +401,7 @@ public class MathPlot {
     // calculate derivative
     // public for testing
     public String calculateDerivative(AOS.Parts node) throws Exception {
+        // TODO: calculate derivative in RPN format
         if (node == null) return "";
 
         String op = node.main;
