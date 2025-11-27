@@ -68,7 +68,7 @@ public class MathPlot {
                 this.ptIt.reset();
 
                 if (!this.ptIt.hasNext()) {
-                        return;
+                    return;
                 }
 
                 this.gc.setLineWidth(this.lineWidth);
@@ -232,8 +232,8 @@ public class MathPlot {
         Trapezoidal
     }
 
-    private String expressionString;         // input expression
-    private String derivativeString;         // output derivative
+    private String expressionString;        // input expression
+    private String derivativeString;        // output derivative
 
     public MathPlot() {
         this.expressionString = null;
@@ -263,9 +263,107 @@ public class MathPlot {
     public void plot(Canvas canvas, PlotType type) {
         final Plotter pf = new Plotter(canvas, new Point(-10, -10), new Point(10, 10));
 
-        // YOU CAN CHANGE HERE
+        // skip if not cartesian
+        if (this.derivativeString == null || type != PlotType.Cartesian) {
+            pf.render();
+            return;
+        }
+
+        // parse derivative string
+        AOS parser = new AOS();
+        AOS.Parts derivativeTree;
+        try {
+            derivativeTree = parser.parse(this.derivativeString);
+        } catch (Exception e) {
+            pf.render();
+            return;
+        }
+
+        ExpressionEvaluator evaluator = new ExpressionEvaluator();
+        final double xMin = -10.0, xMax = 10.0;
+        final int steps = 1200;
+
+        // create iterator over points and breaks
+        Point.Iterator iterator = new Point.Iterator() {
+            int idx = 0;
+            boolean currentBreak = false;
+
+            @Override public void reset() { idx = 0; currentBreak = false; }
+            @Override public boolean hasNext() { return idx <= steps; }
+            @Override public boolean hasBreak() { return currentBreak; }
+            @Override
+            public Point nextPoint() {
+                double t = idx / (double) steps;
+                double x = xMin + t * (xMax - xMin);
+                double y;
+                try { y = evaluator.evaluate(derivativeTree, x); }
+                catch (Exception ex) { y = Double.NaN; }
+
+                // skip break points
+                // break point happens for non-continuous functions and should not be drawn
+                currentBreak = !Double.isFinite(y);
+                idx++;
+                return new Point(x, currentBreak ? 0.0 : y);
+            }
+        };
+
+        // draw axes
+        pf.addLine(new Point(xMin, 0.0), new Point(xMax, 0.0), Color.GRAY, 0.1);
+        pf.addLine(new Point(0.0, -10.0), new Point(0.0, 10.0), Color.GRAY, 0.1);
+
+        // draw derivative
+        pf.addCurve(iterator, Color.RED, 0.2);
 
         pf.render();
+    }
+
+    private static class ExpressionEvaluator {
+        private final AOS parser = new AOS();
+
+        public double evaluate(AOS.Parts node, double x) throws Exception {
+            if (node == null) return Double.NaN;
+
+            String op = node.main;
+            String left = node.left;
+            String right = node.right;
+
+            // evaluate leaf node
+            if (left == null && right == null) {
+                if ("x".equals(op)) return x;
+                try {
+                    return Double.parseDouble(op);
+                } catch (NumberFormatException e) {
+                    throw new Exception("Unknown value: " + op);
+                }
+            }
+
+            // evaluate children nodes
+            double L = 0, R = 0;
+            AOS.Parts leftNode = null, rightNode = null;
+            if (left != null) leftNode = parser.parse(left);
+            if (right != null) rightNode = parser.parse(right);
+
+            // evaluate operators
+            switch (op) {
+                case "+": return evaluate(leftNode, x) + evaluate(rightNode, x);
+                case "-": return evaluate(leftNode, x) - evaluate(rightNode, x);
+                case "*": return evaluate(leftNode, x) * evaluate(rightNode, x);
+                case "/": return evaluate(leftNode, x) / evaluate(rightNode, x);
+
+                case "^":
+                    L = evaluate(leftNode, x);
+                    R = evaluate(rightNode, x);
+                    return Math.pow(L, R);
+
+                case "sin": return Math.sin(evaluate(leftNode, x));
+                case "cos": return Math.cos(evaluate(leftNode, x));
+                case "exp": return Math.exp(evaluate(leftNode, x));
+                case "ln":  return Math.log(evaluate(leftNode, x));
+
+                default:
+                    throw new Exception("Unsupported operator: " + op);
+            }
+        }
     }
 
     public double area(AreaType areaType) {
@@ -277,9 +375,9 @@ public class MathPlot {
     public List<String> print(ExpressionFormat format) {
         List<String> res = new ArrayList<>();
 
-        // stop if format is not AOS
+        // return empty if format is not AOS
         if (format != ExpressionFormat.AOS) {
-            return null;
+            return new ArrayList<>();
         }
 
         // add original expression
@@ -312,7 +410,8 @@ public class MathPlot {
         AOS parser = new AOS();
 
         switch (op) {
-            case "+": case "-": {
+            case "+":
+            case "-": {
                 AOS.Parts leftNode = parser.parse(leftStr);
                 AOS.Parts rightNode = parser.parse(rightStr);
                 return "(" + calculateDerivative(leftNode) + " " + op + " " + calculateDerivative(rightNode) + ")";
@@ -340,11 +439,16 @@ public class MathPlot {
             default: {
                 AOS.Parts argNode = parser.parse(leftStr);
                 switch (op.toLowerCase()) {
-                    case "sin": return "(cos(" + leftStr + ") * " + calculateDerivative(argNode) + ")";
-                    case "cos": return "(-sin(" + leftStr + ") * " + calculateDerivative(argNode) + ")";
-                    case "exp": return "(exp(" + leftStr + ") * " + calculateDerivative(argNode) + ")";
-                    case "ln":  return "(" + calculateDerivative(argNode) + " / " + leftStr + ")";
-                    default:    return "d(" + op + ")";
+                    case "sin":
+                        return "(cos(" + leftStr + ") * " + calculateDerivative(argNode) + ")";
+                    case "cos":
+                        return "(-sin(" + leftStr + ") * " + calculateDerivative(argNode) + ")";
+                    case "exp":
+                        return "(exp(" + leftStr + ") * " + calculateDerivative(argNode) + ")";
+                    case "ln":
+                        return "(" + calculateDerivative(argNode) + " / " + leftStr + ")";
+                    default:
+                        return "d(" + op + ")";
                 }
             }
         }
