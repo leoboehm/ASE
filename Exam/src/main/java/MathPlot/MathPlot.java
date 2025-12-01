@@ -264,9 +264,8 @@ public class MathPlot {
     public void plot(Canvas canvas, PlotType type) {
         final Plotter pf = new Plotter(canvas, new Point(-10, -10), new Point(10, 10));
 
-        // skip if not cartesian
-        if (this.derivativeString == null || type != PlotType.Cartesian) {
-            // TODO: implement polar coordinate format
+        // skip if no derivative set
+        if (this.derivativeString == null) {
             pf.render();
             return;
         }
@@ -282,45 +281,54 @@ public class MathPlot {
         }
 
         ExpressionEvaluator evaluator = new ExpressionEvaluator();
-        // TODO: dynamically set xMin and xMax to make sure graph is always shown
-        // TODO: set xMin and yMax?
-        final double xMin = -10.0, xMax = 10.0;
-        final int steps = 1200;
 
-        // create iterator over points and breaks
-        Point.Iterator iterator = new Point.Iterator() {
-            int idx = 0;
-            boolean currentBreak = false;
+        switch (type) {
+            // cartesian plot
+            case Cartesian -> {
+                double xMin = -10, xMax = 10;
+                int steps = 1200;
 
-            @Override public void reset() { idx = 0; currentBreak = false; }
-            @Override public boolean hasNext() { return idx <= steps; }
-            @Override public boolean hasBreak() { return currentBreak; }
-            @Override
-            public Point nextPoint() {
-                double t = idx / (double) steps;
-                double x = xMin + t * (xMax - xMin);
-                double y;
-                try { y = evaluator.evaluate(derivativeTree, x); }
-                catch (Exception ex) { y = Double.NaN; }
+                // draw plot
+                Point.Iterator iterator = cartesianIterator(derivativeTree, evaluator, xMin, xMax, steps);
+                pf.addLine(new Point(xMin, 0.0), new Point(xMax, 0.0), Color.GRAY, 0.1);
+                pf.addLine(new Point(0.0, -10.0), new Point(0.0, 10.0), Color.GRAY, 0.1);
 
-                // skip break points
-                // break point happens for non-continuous functions and should not be drawn
-                currentBreak = !Double.isFinite(y);
-                idx++;
-                return new Point(x, currentBreak ? 0.0 : y);
+                // iterator iterates over the calculated points and draws a curve
+                pf.addCurve(iterator, Color.RED, 0.2);
+                pf.render();
             }
-        };
 
-        // draw axes
-        pf.addLine(new Point(xMin, 0.0), new Point(xMax, 0.0), Color.GRAY, 0.1);
-        pf.addLine(new Point(0.0, -10.0), new Point(0.0, 10.0), Color.GRAY, 0.1);
+            // polar plot
+            case Polar -> {
+                double thetaMin = 0.0;
+                double thetaMax = 2 * Math.PI;
+                int steps = 1200;
 
-        // draw derivative
-        pf.addCurve(iterator, Color.RED, 0.2);
+                // draw plot
+                Point.Iterator iterator = polarIterator(derivativeTree, evaluator, thetaMin, thetaMax, steps);
+                int circleCount = 4;
+                double rMax = 10;
+                for (int i = 1; i <= circleCount; ++i) {
+                    double r = (rMax * i) / circleCount;
+                    pf.addCircle(new Point(0.0, 0.0), r, Color.LIGHTGRAY, 0.05);
+                }
 
-        pf.render();
+                int radialLines = 8;
+                for (int i = 0; i < radialLines; ++i) {
+                    double theta = (2 * Math.PI * i) / radialLines;
+                    double x = rMax * Math.cos(theta);
+                    double y = rMax * Math.sin(theta);
+                    pf.addLine(new Point(0.0, 0.0), new Point(x, y), Color.LIGHTGRAY, 0.05);
+                }
+
+                // iterator iterates over the calculated points and draws the polar coordinates
+                pf.addCurve(iterator, Color.DARKBLUE, 0.2);
+                pf.render();
+            }
+        }
     }
 
+    // converts AOS expression to math
     private static class ExpressionEvaluator {
         private final AOS parser = new AOS();
 
@@ -349,25 +357,123 @@ public class MathPlot {
 
             // evaluate operators
             switch (op) {
-                case "+": return evaluate(leftNode, x) + evaluate(rightNode, x);
-                case "-": return evaluate(leftNode, x) - evaluate(rightNode, x);
-                case "*": return evaluate(leftNode, x) * evaluate(rightNode, x);
-                case "/": return evaluate(leftNode, x) / evaluate(rightNode, x);
+                case "+":
+                    return evaluate(leftNode, x) + evaluate(rightNode, x);
+                case "-":
+                    return evaluate(leftNode, x) - evaluate(rightNode, x);
+                case "*":
+                    return evaluate(leftNode, x) * evaluate(rightNode, x);
+                case "/":
+                    return evaluate(leftNode, x) / evaluate(rightNode, x);
 
                 case "^":
                     L = evaluate(leftNode, x);
                     R = evaluate(rightNode, x);
                     return Math.pow(L, R);
 
-                case "sin": return Math.sin(evaluate(leftNode, x));
-                case "cos": return Math.cos(evaluate(leftNode, x));
-                case "exp": return Math.exp(evaluate(leftNode, x));
-                case "ln":  return Math.log(evaluate(leftNode, x));
+                case "sin":
+                    return Math.sin(evaluate(leftNode, x));
+                case "cos":
+                    return Math.cos(evaluate(leftNode, x));
+                case "exp":
+                    return Math.exp(evaluate(leftNode, x));
+                case "ln":
+                    return Math.log(evaluate(leftNode, x));
 
                 default:
                     throw new Exception("Unsupported operator: " + op);
             }
         }
+    }
+
+    // calculates points and breaks used to draw cartesian plot
+    // breaks occur in non-continuous functions, the line skips this point
+    private Point.Iterator cartesianIterator(AOS.Parts tree, ExpressionEvaluator eval,
+                                                   double xMin, double xMax, int steps) {
+        return new Point.Iterator() {
+            int idx = 0;
+            boolean currentBreak = false;
+
+            @Override
+            public void reset() {
+                idx = 0;
+                currentBreak = false;
+            }
+            @Override
+            public boolean hasNext() {
+                return idx <= steps;
+            }
+            @Override
+            public boolean hasBreak() {
+                return currentBreak;
+            }
+            @Override
+            public Point nextPoint() {
+                double t = idx / (double) steps;
+                double x = xMin + t * (xMax - xMin);
+                double y;
+
+                try {
+                    y = eval.evaluate(tree, x);
+                } catch (Exception ex) {
+                    y = Double.NaN;
+                }
+
+                // mark current point as break point if function is not continuous here
+                currentBreak = !Double.isFinite(y);
+                idx++;
+
+                return new Point(x, currentBreak ? 0.0 : y);
+            }
+        };
+    }
+
+    // calculates points and breaks used to draw polar coordinates
+    // breaks occur in non-continuous functions, the line skips this point
+    private Point.Iterator polarIterator(AOS.Parts tree, ExpressionEvaluator eval,
+                                               double tMin, double tMax, int steps) {
+        return new Point.Iterator() {
+            int idx = 0;
+            boolean currentBreak = false;
+
+            @Override
+            public void reset() {
+                idx = 0;
+                currentBreak = false;
+            }
+            @Override
+            public boolean hasNext() {
+                return idx <= steps;
+            }
+            @Override
+            public boolean hasBreak() {
+                return currentBreak;
+            }
+            @Override
+            public Point nextPoint() {
+                double t = idx / (double) steps;
+                double theta = tMin + t * (tMax - tMin);
+
+                double r;
+                try {
+                    r = eval.evaluate(tree, theta);
+                } catch (Exception ex) {
+                    r = Double.NaN;
+                }
+
+                double x = Double.NaN, y = Double.NaN;
+                if (Double.isFinite(r)) {
+                    x = r * Math.cos(theta);
+                    y = r * Math.sin(theta);
+                }
+
+                // mark current point as break point if function is not continuous here
+                currentBreak = !Double.isFinite(x) || !Double.isFinite(y);
+                idx++;
+
+                return new Point(currentBreak ? 0.0 : x, currentBreak ? 0.0 : y);
+            }
+        };
     }
 
     public double area(AreaType areaType) {
@@ -399,7 +505,7 @@ public class MathPlot {
     }
 
     // calculate derivative
-    // public for testing
+// public for testing
     public String calculateDerivative(AOS.Parts node) throws Exception {
         // TODO: calculate derivative in RPN format
         if (node == null) return "";
