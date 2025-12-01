@@ -253,9 +253,14 @@ public class MathPlot {
             // parse expression string to AOS
             AOS parser = new AOS();
             AOS.Parts parsedExpression = parser.parse(expr);
+            // simplify expression
+            this.expressionString = simplify(parsedExpression);
 
             // Compute derivative
-            this.derivativeString = calculateDerivative(parsedExpression);
+            String derivative = calculateDerivativeAOS(parsedExpression);
+            // simplify derivative
+            AOS.Parts parsedDerivative = parser.parse(derivative);
+            this.derivativeString = simplify((parsedDerivative));
         } catch (Exception e) {
             throw new RuntimeException("Error while parsing expression: " + e.getMessage());
         }
@@ -389,7 +394,7 @@ public class MathPlot {
     // calculates points and breaks used to draw cartesian plot
     // breaks occur in non-continuous functions, the line skips this point
     private Point.Iterator cartesianIterator(AOS.Parts tree, ExpressionEvaluator eval,
-                                                   double xMin, double xMax, int steps) {
+                                             double xMin, double xMax, int steps) {
         return new Point.Iterator() {
             int idx = 0;
             boolean currentBreak = false;
@@ -399,14 +404,17 @@ public class MathPlot {
                 idx = 0;
                 currentBreak = false;
             }
+
             @Override
             public boolean hasNext() {
                 return idx <= steps;
             }
+
             @Override
             public boolean hasBreak() {
                 return currentBreak;
             }
+
             @Override
             public Point nextPoint() {
                 double t = idx / (double) steps;
@@ -431,7 +439,7 @@ public class MathPlot {
     // calculates points and breaks used to draw polar coordinates
     // breaks occur in non-continuous functions, the line skips this point
     private Point.Iterator polarIterator(AOS.Parts tree, ExpressionEvaluator eval,
-                                               double tMin, double tMax, int steps) {
+                                         double tMin, double tMax, int steps) {
         return new Point.Iterator() {
             int idx = 0;
             boolean currentBreak = false;
@@ -441,14 +449,17 @@ public class MathPlot {
                 idx = 0;
                 currentBreak = false;
             }
+
             @Override
             public boolean hasNext() {
                 return idx <= steps;
             }
+
             @Override
             public boolean hasBreak() {
                 return currentBreak;
             }
+
             @Override
             public Point nextPoint() {
                 double t = idx / (double) steps;
@@ -505,8 +516,8 @@ public class MathPlot {
     }
 
     // calculate derivative
-// public for testing
-    public String calculateDerivative(AOS.Parts node) throws Exception {
+    // public for testing
+    public String calculateDerivativeAOS(AOS.Parts node) throws Exception {
         // TODO: calculate derivative in RPN format
         if (node == null) return "";
 
@@ -527,19 +538,19 @@ public class MathPlot {
             case "-": {
                 AOS.Parts leftNode = parser.parse(leftStr);
                 AOS.Parts rightNode = parser.parse(rightStr);
-                return "(" + calculateDerivative(leftNode) + " " + op + " " + calculateDerivative(rightNode) + ")";
+                return "(" + calculateDerivativeAOS(leftNode) + " " + op + " " + calculateDerivativeAOS(rightNode) + ")";
             }
             case "*": {
                 AOS.Parts leftNode = parser.parse(leftStr);
                 AOS.Parts rightNode = parser.parse(rightStr);
                 // product rule f'g + fg'
-                return "((" + calculateDerivative(leftNode) + " * " + rightStr + ") + (" + leftStr + " * " + calculateDerivative(rightNode) + "))";
+                return "((" + calculateDerivativeAOS(leftNode) + " * " + rightStr + ") + (" + leftStr + " * " + calculateDerivativeAOS(rightNode) + "))";
             }
             case "/": {
                 AOS.Parts leftNode = parser.parse(leftStr);
                 AOS.Parts rightNode = parser.parse(rightStr);
                 // quotient rule (f'g - fg') / g^2
-                return "(((" + calculateDerivative(leftNode) + " * " + rightStr + ") - (" + leftStr + " * " + calculateDerivative(rightNode) + ")) / (" + rightStr + "^2))";
+                return "(((" + calculateDerivativeAOS(leftNode) + " * " + rightStr + ") - (" + leftStr + " * " + calculateDerivativeAOS(rightNode) + ")) / (" + rightStr + "^2))";
             }
             case "^": {
                 try {
@@ -553,17 +564,105 @@ public class MathPlot {
                 AOS.Parts argNode = parser.parse(leftStr);
                 switch (op.toLowerCase()) {
                     case "sin":
-                        return "(cos(" + leftStr + ") * " + calculateDerivative(argNode) + ")";
+                        return "(cos(" + leftStr + ") * " + calculateDerivativeAOS(argNode) + ")";
                     case "cos":
-                        return "(-sin(" + leftStr + ") * " + calculateDerivative(argNode) + ")";
+                        return "(-sin(" + leftStr + ") * " + calculateDerivativeAOS(argNode) + ")";
                     case "exp":
-                        return "(exp(" + leftStr + ") * " + calculateDerivative(argNode) + ")";
+                        return "(exp(" + leftStr + ") * " + calculateDerivativeAOS(argNode) + ")";
                     case "ln":
-                        return "(" + calculateDerivative(argNode) + " / " + leftStr + ")";
+                        return "(" + calculateDerivativeAOS(argNode) + " / " + leftStr + ")";
                     default:
                         return "d(" + op + ")";
                 }
             }
+        }
+    }
+
+    private String simplify(AOS.Parts node) throws Exception {
+        if (node == null)
+            return "";
+
+        // leaf node
+        if (node.left == null && node.right == null)
+            return node.main;
+
+        AOS parser = new AOS();
+
+        // recursively simplify left/right
+        String leftS  = node.left  != null ? simplify(parser.parse(node.left))  : null;
+        String rightS = node.right != null ? simplify(parser.parse(node.right)) : null;
+
+        String op = node.main;
+
+        // safe numeric parsing
+        Double L = tryParseDouble(leftS);
+        Double R = tryParseDouble(rightS);
+
+        boolean leftIsNum = L != null;
+        boolean rightIsNum = R != null;
+
+        // binary operations
+        switch (op) {
+            case "+":
+                if (leftIsNum && rightIsNum) return String.valueOf(L + R);
+                if (leftIsNum && L == 0) return rightS;
+                if (rightIsNum && R == 0) return leftS;
+                return "(" + leftS + " + " + rightS + ")";
+
+            case "-":
+                if (leftIsNum && rightIsNum) return String.valueOf(L - R);
+                if (rightIsNum && R == 0) return leftS;
+                return "(" + leftS + " - " + rightS + ")";
+
+            case "*":
+                if (leftIsNum && rightIsNum) return String.valueOf(L * R);
+                if (leftIsNum && L == 1) return rightS;
+                if (rightIsNum && R == 1) return leftS;
+                if ((leftIsNum && L == 0) || (rightIsNum && R == 0)) return "0";
+                return "(" + leftS + " * " + rightS + ")";
+
+            case "/":
+                if (leftIsNum && rightIsNum) return String.valueOf(L / R);
+                if (rightIsNum && R == 1) return leftS;
+                return "(" + leftS + " / " + rightS + ")";
+
+            case "^":
+                if (rightIsNum) {
+                    if (R == 0) return "1";
+                    if (R == 1) return leftS;
+                    if (leftIsNum) return String.valueOf(Math.pow(L, R));
+                }
+                return "(" + leftS + "^" + rightS + ")";
+        }
+
+        // other operations
+        switch (op) {
+            case "sin":
+                if (leftIsNum) return String.valueOf(Math.sin(L));
+                return "sin(" + leftS + ")";
+
+            case "cos":
+                if (leftIsNum) return String.valueOf(Math.cos(L));
+                return "cos(" + leftS + ")";
+
+            case "exp":
+                if (leftIsNum) return String.valueOf(Math.exp(L));
+                return "exp(" + leftS + ")";
+
+            case "ln":
+                if (leftIsNum) return String.valueOf(Math.log(L));
+                return "ln(" + leftS + ")";
+        }
+
+        return "(" + op + "(" + leftS + (rightS != null ? "," + rightS : "") + "))";
+    }
+
+    private Double tryParseDouble(String s) {
+        if (s == null) return null;
+        try {
+            return Double.parseDouble(s);
+        } catch (NumberFormatException e) {
+            return null;
         }
     }
 }
