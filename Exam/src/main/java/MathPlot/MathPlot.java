@@ -269,17 +269,13 @@ public class MathPlot {
     public void plot(Canvas canvas, PlotType type) {
         final Plotter pf = new Plotter(canvas, new Point(-10, -10), new Point(10, 10));
 
-        // skip if no derivative set
-        if (this.derivativeString == null) {
-            pf.render();
-            return;
-        }
-
-        // parse derivative string
+        // parse expression strings
         AOS parser = new AOS();
         AOS.Parts derivativeTree;
+        AOS.Parts expressionTree;
         try {
             derivativeTree = parser.parse(this.derivativeString);
+            expressionTree = parser.parse(this.expressionString);
         } catch (Exception e) {
             pf.render();
             return;
@@ -293,13 +289,21 @@ public class MathPlot {
                 double xMin = -10, xMax = 10;
                 int steps = 1200;
 
-                // draw plot
-                Point.Iterator iterator = cartesianIterator(derivativeTree, evaluator, xMin, xMax, steps);
+                // coordinate axes
                 pf.addLine(new Point(xMin, 0.0), new Point(xMax, 0.0), Color.GRAY, 0.1);
                 pf.addLine(new Point(0.0, -10.0), new Point(0.0, 10.0), Color.GRAY, 0.1);
 
-                // iterator iterates over the calculated points and draws a curve
-                pf.addCurve(iterator, Color.RED, 0.2);
+                // expression plot
+                if (expressionTree != null) {
+                    Point.Iterator expressionIterator = cartesianIterator(expressionTree, evaluator, xMin, xMax, steps);
+                    pf.addCurve(expressionIterator, Color.BLUE, 0.2);
+                }
+                // derivative plot
+                if (derivativeTree != null) {
+                    Point.Iterator derivativeIterator = cartesianIterator(derivativeTree, evaluator, xMin, xMax, steps);
+                    pf.addCurve(derivativeIterator, Color.RED, 0.2);
+                }
+
                 pf.render();
             }
 
@@ -309,15 +313,13 @@ public class MathPlot {
                 double thetaMax = 2 * Math.PI;
                 int steps = 1200;
 
-                // draw plot
-                Point.Iterator iterator = polarIterator(derivativeTree, evaluator, thetaMin, thetaMax, steps);
+                // background grid
                 int circleCount = 4;
                 double rMax = 10;
                 for (int i = 1; i <= circleCount; ++i) {
                     double r = (rMax * i) / circleCount;
                     pf.addCircle(new Point(0.0, 0.0), r, Color.LIGHTGRAY, 0.05);
                 }
-
                 int radialLines = 8;
                 for (int i = 0; i < radialLines; ++i) {
                     double theta = (2 * Math.PI * i) / radialLines;
@@ -326,8 +328,17 @@ public class MathPlot {
                     pf.addLine(new Point(0.0, 0.0), new Point(x, y), Color.LIGHTGRAY, 0.05);
                 }
 
-                // iterator iterates over the calculated points and draws the polar coordinates
-                pf.addCurve(iterator, Color.DARKBLUE, 0.2);
+                // expression plot
+                if (expressionTree != null) {
+                    Point.Iterator expressionIterator = polarIterator(expressionTree, evaluator, thetaMin, thetaMax, steps);
+                    pf.addCurve(expressionIterator, Color.BLUE, 0.2);
+                }
+                // derivative plot
+                if (derivativeTree != null) {
+                    Point.Iterator derivativeIterator = polarIterator(derivativeTree, evaluator, thetaMin, thetaMax, steps);
+                    pf.addCurve(derivativeIterator, Color.DARKRED, 0.2);
+                }
+
                 pf.render();
             }
         }
@@ -589,7 +600,7 @@ public class MathPlot {
         AOS parser = new AOS();
 
         // recursively simplify left/right
-        String leftS  = node.left  != null ? simplify(parser.parse(node.left))  : null;
+        String leftS = node.left != null ? simplify(parser.parse(node.left)) : null;
         String rightS = node.right != null ? simplify(parser.parse(node.right)) : null;
 
         String op = node.main;
