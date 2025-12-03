@@ -241,26 +241,25 @@ public class MathPlot {
     }
 
     public void setExpression(String expr, ExpressionFormat format) {
+        this.expressionString = expr;
+
         // stop if format is not AOS
         if (format != ExpressionFormat.AOS) {
             // TODO: implement RPN format
             return;
         }
-
-        this.expressionString = expr;
-
         try {
             // parse expression string to AOS
             AOS parser = new AOS();
             AOS.Parts parsedExpression = parser.parse(expr);
             // simplify expression
-            this.expressionString = simplify(parsedExpression);
+            this.expressionString = simplifyAOS(parsedExpression);
 
             // Compute derivative
             String derivative = calculateDerivativeAOS(parsedExpression);
             // simplify derivative
             AOS.Parts parsedDerivative = parser.parse(derivative);
-            this.derivativeString = simplify((parsedDerivative));
+            this.derivativeString = simplifyAOS((parsedDerivative));
         } catch (Exception e) {
             throw new RuntimeException("Error while parsing expression: " + e.getMessage());
         }
@@ -391,10 +390,6 @@ public class MathPlot {
                     return Math.sin(evaluate(leftNode, x));
                 case "cos":
                     return Math.cos(evaluate(leftNode, x));
-                case "exp":
-                    return Math.exp(evaluate(leftNode, x));
-                case "ln":
-                    return Math.log(evaluate(leftNode, x));
 
                 default:
                     throw new Exception("Unsupported operator: " + op);
@@ -636,10 +631,6 @@ public class MathPlot {
                         return "(cos(" + leftStr + ") * " + calculateDerivativeAOS(argNode) + ")";
                     case "cos":
                         return "(-sin(" + leftStr + ") * " + calculateDerivativeAOS(argNode) + ")";
-                    case "exp":
-                        return "(exp(" + leftStr + ") * " + calculateDerivativeAOS(argNode) + ")";
-                    case "ln":
-                        return "(" + calculateDerivativeAOS(argNode) + " / " + leftStr + ")";
                     default:
                         return "d(" + op + ")";
                 }
@@ -647,7 +638,7 @@ public class MathPlot {
         }
     }
 
-    private String simplify(AOS.Parts node) throws Exception {
+    private String simplifyAOS(AOS.Parts node) throws Exception {
         if (node == null)
             return "";
 
@@ -658,8 +649,8 @@ public class MathPlot {
         AOS parser = new AOS();
 
         // recursively simplify left/right
-        String leftS = node.left != null ? simplify(parser.parse(node.left)) : null;
-        String rightS = node.right != null ? simplify(parser.parse(node.right)) : null;
+        String leftS = node.left != null ? simplifyAOS(parser.parse(node.left)) : null;
+        String rightS = node.right != null ? simplifyAOS(parser.parse(node.right)) : null;
 
         String op = node.main;
 
@@ -713,14 +704,6 @@ public class MathPlot {
             case "cos":
                 if (leftIsNum) return String.valueOf(Math.cos(L));
                 return "cos(" + leftS + ")";
-
-            case "exp":
-                if (leftIsNum) return String.valueOf(Math.exp(L));
-                return "exp(" + leftS + ")";
-
-            case "ln":
-                if (leftIsNum) return String.valueOf(Math.log(L));
-                return "ln(" + leftS + ")";
         }
 
         return "(" + op + "(" + leftS + (rightS != null ? "," + rightS : "") + "))";
