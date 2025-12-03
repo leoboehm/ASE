@@ -359,7 +359,7 @@ public class MathPlot {
             if (left == null && right == null) {
                 if ("x".equals(op)) return x;
                 try {
-                    return Double.parseDouble(op);
+                    return Integer.parseInt(op);
                 } catch (NumberFormatException e) {
                     throw new Exception("Unknown value: " + op);
                 }
@@ -499,10 +499,68 @@ public class MathPlot {
     }
 
     public double area(AreaType areaType) {
-        // TODO: implement area calculation (rectangular & trapezian)
-        // YOU CAN CHANGE HERE
+        // skip if expression is empty
+        if (this.expressionString == null) {
+            return 0.0;
+        }
 
-        return 0.0;
+        try {
+            // parse expression
+            AOS parser = new AOS();
+            AOS.Parts expr = parser.parse(this.expressionString);
+            ExpressionEvaluator eval = new ExpressionEvaluator();
+
+            // integration bounds (same as plot)
+            final double xMin = -10.0;
+            final double xMax =  10.0;
+            final int steps = 10_000;
+            final double dx = (xMax - xMin) / steps;
+
+            double area = 0.0;
+
+            switch (areaType) {
+                // calculate area with rectangular method
+                case Rectangular: {
+                    for (int i = 0; i < steps; i++) {
+                        double x = xMin + i * dx;
+                        double y;
+
+                        try {
+                            y = eval.evaluate(expr, x);
+                        } catch (Exception ex) {
+                            y = 0.0;
+                        }
+
+                        area += y * dx;
+                    }
+                    break;
+                }
+
+                // calculate area with trapezoidal method
+                case Trapezoidal: {
+                    for (int i = 0; i < steps; i++) {
+                        double x1 = xMin + i * dx;
+                        double x2 = x1 + dx;
+
+                        double y1, y2;
+
+                        try { y1 = eval.evaluate(expr, x1); }
+                        catch (Exception ex) { y1 = 0.0; }
+
+                        try { y2 = eval.evaluate(expr, x2); }
+                        catch (Exception ex) { y2 = 0.0; }
+
+                        area += 0.5 * (y1 + y2) * dx;
+                    }
+                    break;
+                }
+            }
+
+            return area;
+
+        } catch (Exception e) {
+            return 0.0;
+        }
     }
 
     public List<String> print(ExpressionFormat format) {
@@ -528,8 +586,8 @@ public class MathPlot {
 
     // calculate derivative
     // public for testing
+    // TODO: calculate derivative in RPN format
     public String calculateDerivativeAOS(AOS.Parts node) throws Exception {
-        // TODO: calculate derivative in RPN format
         if (node == null) return "";
 
         String op = node.main;
@@ -573,7 +631,7 @@ public class MathPlot {
             }
             default: {
                 AOS.Parts argNode = parser.parse(leftStr);
-                switch (op.toLowerCase()) {
+                switch (op) {
                     case "sin":
                         return "(cos(" + leftStr + ") * " + calculateDerivativeAOS(argNode) + ")";
                     case "cos":
@@ -606,8 +664,8 @@ public class MathPlot {
         String op = node.main;
 
         // safe numeric parsing
-        Double L = tryParseDouble(leftS);
-        Double R = tryParseDouble(rightS);
+        Integer L = tryParseInteger(leftS);
+        Integer R = tryParseInteger(rightS);
 
         boolean leftIsNum = L != null;
         boolean rightIsNum = R != null;
@@ -668,10 +726,10 @@ public class MathPlot {
         return "(" + op + "(" + leftS + (rightS != null ? "," + rightS : "") + "))";
     }
 
-    private Double tryParseDouble(String s) {
+    private Integer tryParseInteger(String s) {
         if (s == null) return null;
         try {
-            return Double.parseDouble(s);
+            return Integer.parseInt(s);
         } catch (NumberFormatException e) {
             return null;
         }
