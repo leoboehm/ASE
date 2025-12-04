@@ -13,18 +13,22 @@ public class FormatTranslator {
     public static Node fromRPN(String expression) throws Exception {
         throw new Exception("Format is not implemented");
     }
+
     public static String toString(Node expression, ExpressionFormat format) throws Exception {
         if (format == ExpressionFormat.AOS){
             return buildStringFromAOS(expression);
         } else {
+            // TODO: does this even happen? Working format is always AOS
             return buildStringFromRPN(expression);
         }
     }
 
+    // build AOS tree from string
     private static Node buildAOS(String expression) throws Exception {
         AOS parser = new AOS();
         AOS.Parts parts = parser.parse(expression);
 
+        // check if expression is a number
         try {
             double val = Double.parseDouble(parts.main);
             return new Constant(val);
@@ -32,15 +36,17 @@ public class FormatTranslator {
             // continue
         }
 
-        if (parts.main.equalsIgnoreCase("x")) {
+        // check if expression is a var
+        if (parts.main.equals("x")) {
             return new Variable();
         }
 
+        // check if expression is sin or cos -> recursively evaluate
         String op = parts.main;
-
         if (op.equals("sin")) return new Sin(buildAOS(parts.left));
         if (op.equals("cos")) return new Cos(buildAOS(parts.left));
 
+        // check for binary operations
         Node left = buildAOS(parts.left);
         Node right = buildAOS(parts.right);
         return switch (op) {
@@ -53,7 +59,9 @@ public class FormatTranslator {
         };
     }
 
+    // build string from AOS tree
     private static String buildStringFromAOS(Node expr) {
+        // basically do buildAOS() backwards
         switch (expr) {
             case Variable _ -> {
                 return "x";

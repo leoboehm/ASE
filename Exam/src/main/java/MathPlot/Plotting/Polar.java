@@ -7,9 +7,10 @@ import javafx.scene.paint.Color;
 
 public class Polar implements PlotStrategy {
     public void plot(PlotterInterface plotter, Node func, Node deriv) {
+        // draw expression & derivative plots
         drawPolar(plotter, func, Color.BLUE);
         drawPolar(plotter, deriv, Color.RED);
-        // Grid
+        // draw grid
         int circleCount = 4;
         double rMax = 100;
         for (int i = 1; i <= circleCount; ++i) {
@@ -26,14 +27,15 @@ public class Polar implements PlotStrategy {
     }
 
     private void drawPolar(PlotterInterface plotter, Node node, Color c) {
-        plotter.addCurve(new PolarIterator(node, 0, Math.PI * 4, 0.1), c, 0.2);
+        // step size = 0.1
+        plotter.addCurve(new Iterator(node, 0, Math.PI * 4, 0.1), c, 0.2);
     }
 
-    class PolarIterator implements Point.Iterator {
+    class Iterator implements Point.Iterator {
         private Node node;
         private double start, end, step, current;
 
-        public PolarIterator(Node n, double s, double e, double st) {
+        public Iterator(Node n, double s, double e, double st) {
             this.node = n;
             start = s;
             end = e;

@@ -16,7 +16,7 @@ public class Sin implements Node {
 
     public Node calculateDerivative() {
         return new Mult(new Cos(child), child.calculateDerivative());
-    } // Kettenregel
+    }
 
     public Node simplify() {
         return new Sin(child.simplify());

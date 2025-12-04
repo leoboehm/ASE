@@ -15,7 +15,7 @@ public class Mult extends BinaryOperation {
 
     public Node calculateDerivative() {
         return new Add(new Mult(left.calculateDerivative(), right), new Mult(left, right.calculateDerivative()));
-    } // Produktregel
+    }
 
     public Node simplify() {
         Node l = left.simplify();

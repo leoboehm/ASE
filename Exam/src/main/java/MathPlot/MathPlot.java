@@ -239,8 +239,8 @@ public class MathPlot {
         Trapezoidal
     }
 
-    private Node expressionString;        // input expression
-    private Node derivativeString;        // output derivative
+    private Node expressionString;      // input expression
+    private Node derivativeString;      // output derivative
 
     public MathPlot() {
         this.expressionString = new Constant(0);

@@ -14,12 +14,8 @@ public class Power extends BinaryOperation {
     }
 
     public Node calculateDerivative() {
-        // Vereinfachte Ableitung für x^n (r ist konstant angenommen für Basisimplementierung)
-        if (right instanceof Constant) {
-            double n = right.eval(0);
-            return new Mult(new Mult(right, new Power(left, new Constant(n - 1))), left.calculateDerivative());
-        }
-        return new Constant(0); // Fallback
+        double n = right.eval(0);
+        return new Mult(new Mult(right, new Power(left, new Constant(n - 1))), left.calculateDerivative());
     }
 
     public Node simplify() {
