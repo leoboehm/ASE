@@ -1,4 +1,4 @@
-package MathPlot.Calculators.Plotting;
+package MathPlot.Plotting;
 
 import MathPlot.Calculators.Node;
 import MathPlot.PlotterInterface;

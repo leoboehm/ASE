@@ -1,6 +1,5 @@
 package MathPlot;
 
-import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -9,11 +8,9 @@ import MathPlot.AreaCalculation.Rectangular;
 import MathPlot.AreaCalculation.Trapezoidal;
 import MathPlot.Calculators.Node;
 import MathPlot.Calculators.Operators.Constant;
-import MathPlot.Calculators.Plotting.Cartesian;
-import MathPlot.Calculators.Plotting.PlotStrategy;
-import MathPlot.Calculators.Plotting.Polar;
-import MathPlot.Parsers.AOS;
-import MathPlot.Parsers.RPN;
+import MathPlot.Plotting.Cartesian;
+import MathPlot.Plotting.PlotStrategy;
+import MathPlot.Plotting.Polar;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.input.MouseButton;
@@ -290,7 +287,6 @@ public class MathPlot {
             strategy = new Rectangular();
         }
 
-        // Bereich fest auf 0 bis 10 für Demo, oder dynamisch erweitern wenn Parameter erlaubt wären
         return strategy.calculate(this.expressionString, 0, 10, 0.1);
     }
 
